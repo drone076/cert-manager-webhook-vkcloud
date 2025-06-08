@@ -201,19 +201,17 @@ func getZoneID(zone string, token string) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	var zonesResponse struct {
-		Zones []struct {
-			UUID string `json:"uuid"`
-			Name string `json:"name"`
-		} `json:"zones"`
+	var zones []struct {
+		UUID string `json:"uuid"`
+		Name string `json:"name"`
 	}
 
 	body, _ := io.ReadAll(resp.Body)
-	if err := json.Unmarshal(body, &zonesResponse); err != nil {
+	if err := json.Unmarshal(body, &zones); err != nil {
 		return "", fmt.Errorf("failed to parse zones response: %w", err)
 	}
 
-	for _, z := range zonesResponse.Zones {
+	for _, z := range zones {
 		if strings.TrimSuffix(z.Name, ".") == strings.TrimSuffix(zone, ".") {
 			return z.UUID, nil
 		}
