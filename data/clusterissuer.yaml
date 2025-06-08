@@ -1,0 +1,22 @@
+# clusterissuer.yaml
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: sampleclusterissuer
+spec:
+  acme:
+    email: support@example.com
+    privateKeySecretRef:
+      name: letsencrypt
+    server: https://acme-v02.api.letsencrypt.org/directory 
+    solvers:
+      - dns01:
+          webhook:
+            groupName: acme.cloud.vk.com
+            solverName: cert-manager-webhook-vkcloud
+            configMapRef:
+              name: vkcloud-config
+            insecureSkipTLSVerify: true # only if needed
+      selector:
+        dnsNames:
+          - example.com

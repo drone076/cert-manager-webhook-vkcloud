@@ -1,0 +1,8 @@
+# vkcloud-config.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vkcloud-config
+  namespace: cert-manager
+data:
+  credentialsSecretName: vkcloud-secret
