@@ -221,7 +221,7 @@ func getZoneID(zone string, token string) (string, error) {
 func createTXTRecord(zoneID, fqdn, key, token string) error {
 	record := map[string]any{
 		"name": fqdn,
-		"data": key,
+		"content": key,
 		"ttl":  60,
 	}
 
