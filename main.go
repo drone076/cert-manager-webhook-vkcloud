@@ -126,7 +126,7 @@ func loadConfig(cfgJSON *extapi.JSON) (vkcloudDNSConfig, error) {
 	return cfg, nil
 }
 
-// authenticate gets X-Subject-Token from OpenStack Identity
+// authenticate gets X-Subject-Token
 func authenticate(clientset *kubernetes.Clientset, namespace string, secretRef corev1.SecretReference) (string, error) {
 	secret, err := clientset.CoreV1().Secrets(namespace).Get(context.TODO(), secretRef.Name, metav1.GetOptions{})
 	if err != nil {
