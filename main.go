@@ -22,10 +22,7 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-const (
-	dnsAPIBaseURL   = "https://mcs.mail.ru/public-dns/v2/dns/"
-	authAPIEndpoint = "https://infra.mail.ru:35357/v3/auth/tokens"
-)
+const dnsAPIBaseURL = "https://mcs.mail.ru/public-dns/v2/dns/"
 
 var GroupName = os.Getenv("GROUP_NAME")
 
@@ -142,12 +139,12 @@ func authenticate(clientset *kubernetes.Clientset, namespace string, secretRef c
 	osProjectID := string(secret.Data["os_project_id"])
 	osDomainName := string(secret.Data["os_domain_name"])
 
-	body := map[string]interface{}{
-		"auth": map[string]interface{}{
-			"identity": map[string]interface{}{
+	body := map[string]any{
+		"auth": map[string]any{
+			"identity": map[string]any{
 				"methods": []string{"password"},
-				"password": map[string]interface{}{
-					"user": map[string]interface{}{
+				"password": map[string]any{
+					"user": map[string]any{
 						"name":     osUsername,
 						"password": osPassword,
 						"domain": map[string]string{
@@ -156,7 +153,7 @@ func authenticate(clientset *kubernetes.Clientset, namespace string, secretRef c
 					},
 				},
 			},
-			"scope": map[string]interface{}{
+			"scope": map[string]any{
 				"project": map[string]string{
 					"id": osProjectID,
 				},
@@ -222,7 +219,7 @@ func getZoneID(zone string, token string) (string, error) {
 
 // createTXTRecord adds a TXT record under the zone
 func createTXTRecord(zoneID, fqdn, key, token string) error {
-	record := map[string]interface{}{
+	record := map[string]any{
 		"name": fqdn,
 		"data": key,
 		"ttl":  60,
@@ -232,13 +229,17 @@ func createTXTRecord(zoneID, fqdn, key, token string) error {
 	url := fmt.Sprintf(zoneTXTRecordsURL, zoneID)
 	jsonBody, _ := json.Marshal(record)
 
-	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(jsonBody))
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return fmt.Errorf("failed to create HTTP request: %w", err)
+	}
 	req.Header.Set("X-Auth-Token", token)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	resp, err := httpClient.Do(req)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create TXT record: %w", err)
 	}
 	defer resp.Body.Close()
 
