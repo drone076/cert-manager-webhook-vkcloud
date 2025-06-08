@@ -15,7 +15,8 @@ certManager:
 image:
   repository: drone076/cert-manager-webhook-vkcloud
   tag: latest
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
+  # pullPolicy: IfNotPresent
 
 nameOverride: ""
 fullnameOverride: ""
