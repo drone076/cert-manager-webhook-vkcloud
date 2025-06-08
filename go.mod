@@ -1,6 +1,8 @@
 module github.com/drone076/cert-manager-webhook-vkcloud
 
-go 1.24.4
+go 1.22.0
+
+toolchain go1.22.4
 
 require (
 	github.com/cert-manager/cert-manager v1.17.2
