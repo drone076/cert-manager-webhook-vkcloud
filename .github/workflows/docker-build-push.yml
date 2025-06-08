@@ -2,8 +2,6 @@ name: Build and Push Docker Image
 
 on:
   push:
-    branches:
-      - main
     tags:
       - 'v*'  # Triggers build only when tags like v1.0.0 are pushed
 
