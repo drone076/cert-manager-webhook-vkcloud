@@ -14,6 +14,7 @@ import (
 
 	acme "github.com/cert-manager/cert-manager/pkg/acme/webhook/apis/acme/v1alpha1"
 	"github.com/cert-manager/cert-manager/pkg/acme/webhook/cmd"
+
 	corev1 "k8s.io/api/core/v1"
 	extapi "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,13 +42,7 @@ func main() {
 		panic("GROUP_NAME must be specified")
 	}
 
-	// Set up options including TLS config
-	opts := cmd.WebhookServerOptions{
-		CertFile: *tlsCertFile,
-		KeyFile:  *tlsPrivateKeyFile,
-	}
-
-	cmd.RunWebhookServer(opts, GroupName, &vkcloudDNSSolver{})
+	cmd.RunWebhookServer(GroupName, &vkcloudDNSSolver{})
 }
 
 // vkcloudDNSSolver implements the cert-manager Solver interface for VK Cloud DNS
