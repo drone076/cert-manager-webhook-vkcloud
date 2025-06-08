@@ -220,9 +220,9 @@ func getZoneID(zone string, token string) (string, error) {
 // createTXTRecord adds a TXT record under the zone
 func createTXTRecord(zoneID, fqdn, key, token string) error {
 	record := map[string]any{
-		"name": fqdn,
+		"name":    fqdn,
 		"content": key,
-		"ttl":  60,
+		"ttl":     60,
 	}
 
 	zoneTXTRecordsURL := dnsAPIBaseURL + "%s/txt/"
@@ -269,9 +269,9 @@ func deleteTXTRecord(zoneID, fqdn, key, token string) error {
 
 	var recordsResponse struct {
 		TXTRecords []struct {
-			UUID string `json:"uuid"`
-			Name string `json:"name"`
-			Data string `json:"data"`
+			UUID    string `json:"uuid"`
+			Name    string `json:"name"`
+			Content string `json:"content"`
 		} `json:"txt_records"`
 	}
 
@@ -281,7 +281,7 @@ func deleteTXTRecord(zoneID, fqdn, key, token string) error {
 	}
 
 	for _, r := range recordsResponse.TXTRecords {
-		if r.Name == fqdn && r.Data == key {
+		if r.Name == fqdn && r.Content == key {
 			zoneTXTRecordsURL := dnsAPIBaseURL + "%s/txt/%s"
 			deleteURL := fmt.Sprintf(zoneTXTRecordsURL, zoneID, r.UUID)
 
