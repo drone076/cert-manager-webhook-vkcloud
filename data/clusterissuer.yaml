@@ -14,9 +14,10 @@ spec:
           webhook:
             groupName: acme.cloud.vk.com
             solverName: cert-manager-webhook-vkcloud
-            configMapRef:
-              name: vkcloud-config
-            insecureSkipTLSVerify: true # only if needed
-      selector:
-        dnsNames:
+            config:
+              secretRef:
+                name: vkcloud-secret
+                namespace: cert-manager
+        selector:
+          dnsNames:
           - example.com
