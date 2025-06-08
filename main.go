@@ -203,7 +203,7 @@ func getZoneID(zone string, token string) (string, error) {
 
 	var zones []struct {
 		UUID string `json:"uuid"`
-		Name string `json:"name"`
+		Name string `json:"zone"`
 	}
 
 	body, _ := io.ReadAll(resp.Body)
