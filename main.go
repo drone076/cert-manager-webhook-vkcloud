@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"net/http"
@@ -27,13 +28,26 @@ const (
 
 var GroupName = os.Getenv("GROUP_NAME")
 
+var (
+	// These flags are required by cert-manager for TLS
+	tlsCertFile       = flag.String("tls-cert-file", "", "Path to the TLS certificate file")
+	tlsPrivateKeyFile = flag.String("tls-private-key-file", "", "Path to the TLS private key file")
+)
+
 func main() {
+	flag.Parse()
 
 	if GroupName == "" {
 		panic("GROUP_NAME must be specified")
 	}
 
-	cmd.RunWebhookServer(GroupName, &vkcloudDNSSolver{})
+	// Set up options including TLS config
+	opts := cmd.WebhookServerOptions{
+		CertFile: *tlsCertFile,
+		KeyFile:  *tlsPrivateKeyFile,
+	}
+
+	cmd.RunWebhookServer(opts, GroupName, &vkcloudDNSSolver{})
 }
 
 // vkcloudDNSSolver implements the cert-manager Solver interface for VK Cloud DNS
