@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -27,101 +26,15 @@ const (
 	authAPIEndpoint = "https://infra.mail.ru:35357/v3/auth/tokens"
 )
 
-var testMode bool
-
-func init() {
-	flag.BoolVar(&testMode, "test-local", false, "run in local test mode")
-	flag.Parse()
-
-}
-
 var GroupName = os.Getenv("GROUP_NAME")
 
 func main() {
-	if testMode {
-		runLocalTest()
-		return
-	}
 
 	if GroupName == "" {
 		panic("GROUP_NAME must be specified")
 	}
 
 	cmd.RunWebhookServer(GroupName, &vkcloudDNSSolver{})
-}
-
-func runLocalTest() {
-	token, err := authenticateDirect(
-		"https://infra.mail.ru:35357/v3/auth/tokens",
-		"your-user",
-		"your-pass",
-		"project-123456",
-		"Default",
-	)
-	if err != nil {
-		log.Fatalf("Auth failed: %v", err)
-	}
-
-	zoneID, err := getZoneID("example.com.", token)
-	if err != nil {
-		log.Fatalf("Zone lookup failed: %v", err)
-	}
-
-	err = createTXTRecord(zoneID, "_acme-challenge.example.com.", "abcxyz123", token)
-	if err != nil {
-		log.Fatalf("TXT create failed: %v", err)
-	}
-
-	time.Sleep(5 * time.Second)
-
-	err = deleteTXTRecord(zoneID, "_acme-challenge.example.com.", "abcxyz123", token)
-	if err != nil {
-		log.Fatalf("TXT delete failed: %v", err)
-	}
-}
-
-// authenticateDirect is used for local testing with raw values
-func authenticateDirect(authURL, username, password, projectID, domainName string) (string, error) {
-	body := map[string]interface{}{
-		"auth": map[string]interface{}{
-			"identity": map[string]interface{}{
-				"methods": []string{"password"},
-				"password": map[string]interface{}{
-					"user": map[string]interface{}{
-						"name":     username,
-						"password": password,
-						"domain": map[string]string{
-							"id": domainName,
-						},
-					},
-				},
-			},
-			"scope": map[string]interface{}{
-				"project": map[string]string{
-					"id": projectID,
-				},
-			},
-		},
-	}
-
-	jsonBody, _ := json.Marshal(body)
-
-	req, _ := http.NewRequest("POST", authURL, bytes.NewBuffer(jsonBody))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("authentication failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	token := resp.Header.Get("X-Subject-Token")
-	if token == "" {
-		return "", fmt.Errorf("no auth token received from VK Cloud")
-	}
-
-	return token, nil
 }
 
 // vkcloudDNSSolver implements the cert-manager Solver interface for VK Cloud DNS
