@@ -199,7 +199,7 @@ func getZoneID(zone string, token string) (string, error) {
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Set("X-Auth-Token", token)
 
-	httpClient := &http.Client{Timeout: 10 * time.Second}
+	httpClient := &http.Client{Timeout: 30 * time.Second}
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch zones: %w", err)
