@@ -3,7 +3,7 @@ name: Build and Push Docker Image
 on:
   push:
     branches:
-      - main  # Or the branch you want to trigger the build
+      - main
 
 jobs:
   build:
@@ -30,4 +30,6 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ secrets.DOCKER_HUB_USERNAME }}/my-docker-image:latest
+          tags: |
+            ${{ secrets.DOCKER_HUB_USERNAME }}/cert-manager-webhook-vkcloud:latest
+            ${{ secrets.DOCKER_HUB_USERNAME }}/cert-manager-webhook-vkcloud:${{ github.sha }}
