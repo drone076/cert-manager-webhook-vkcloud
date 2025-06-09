@@ -170,7 +170,8 @@ func authenticate(clientset *kubernetes.Clientset, namespace string, secretRef c
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("authentication failed: %w", err)
 	}
@@ -260,7 +261,7 @@ func deleteTXTRecord(zoneID, fqdn, key, token string) error {
 	req.Header.Set("X-Auth-Token", token)
 	req.Header.Set("Content-Type", "application/json")
 
-	httpClient := &http.Client{Timeout: 10 * time.Second}
+	httpClient := &http.Client{Timeout: 30 * time.Second}
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return err
@@ -280,6 +281,8 @@ func deleteTXTRecord(zoneID, fqdn, key, token string) error {
 		return fmt.Errorf("failed to parse TXT records: %w", err)
 	}
 
+	var deleteErrors []string
+
 	for _, r := range recordsResponse.TXTRecords {
 		if r.Name == fqdn && r.Content == key {
 			zoneTXTRecordsURL := dnsAPIBaseURL + "%s/txt/%s"
@@ -290,11 +293,23 @@ func deleteTXTRecord(zoneID, fqdn, key, token string) error {
 
 			resp, err := httpClient.Do(delReq)
 			if err != nil {
-				return err
+				deleteErrors = append(deleteErrors, fmt.Sprintf("failed to delete TXT record %q: %v", r.UUID, err))
+				continue
 			}
 			defer resp.Body.Close()
-			break
+
+			if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
+				deleteErrors = append(deleteErrors, fmt.Sprintf(
+					"failed to delete TXT record %q: unexpected status code %d",
+					r.UUID,
+					resp.StatusCode,
+				))
+			}
 		}
+	}
+
+	if len(deleteErrors) > 0 {
+		return fmt.Errorf("one or more TXT records failed to delete:\n%s", strings.Join(deleteErrors, "\n"))
 	}
 
 	return nil
