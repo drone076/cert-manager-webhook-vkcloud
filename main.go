@@ -85,7 +85,11 @@ func (c *vkcloudDNSSolver) Present(ch *acme.ChallengeRequest) error {
 
 // CleanUp deletes the TXT record after validation
 func (c *vkcloudDNSSolver) CleanUp(ch *acme.ChallengeRequest) error {
-	cfg, _ := loadConfig(ch.Config)
+	cfg, err := loadConfig(ch.Config)
+	if err != nil {
+		return fmt.Errorf("error decoding solver config: %w", err)
+	}
+
 	authToken, err := authenticate(c.client, ch.ResourceNamespace, cfg.SecretRef)
 	if err != nil {
 		return err
@@ -166,7 +170,10 @@ func authenticate(clientset *kubernetes.Clientset, namespace string, secretRef c
 		return "", fmt.Errorf("failed to marshal JSON: %w", err)
 	}
 
-	req, _ := http.NewRequest("POST", osAuthURL, bytes.NewBuffer(jsonBody))
+	req, err := http.NewRequest("POST", osAuthURL, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return "", fmt.Errorf("failed to create authentication request: %w", err)
+	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 
@@ -176,6 +183,14 @@ func authenticate(clientset *kubernetes.Clientset, namespace string, secretRef c
 		return "", fmt.Errorf("authentication failed: %w", err)
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return "", fmt.Errorf("authentication failed with status %d: failed to read response body: %w", resp.StatusCode, err)
+		}
+		return "", fmt.Errorf("authentication failed with status %d: %s", resp.StatusCode, body)
+	}
 
 	token := resp.Header.Get("X-Subject-Token")
 	if token == "" {
@@ -189,7 +204,10 @@ func authenticate(clientset *kubernetes.Clientset, namespace string, secretRef c
 func getZoneID(zone string, token string) (string, error) {
 	url := dnsAPIBaseURL
 
-	req, _ := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create zones request: %w", err)
+	}
 	req.Header.Set("X-Auth-Token", token)
 
 	httpClient := &http.Client{Timeout: 30 * time.Second}
@@ -199,12 +217,23 @@ func getZoneID(zone string, token string) (string, error) {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return "", fmt.Errorf("failed to fetch zones with status %d: failed to read response body: %w", resp.StatusCode, err)
+		}
+		return "", fmt.Errorf("failed to fetch zones with status %d: %s", resp.StatusCode, body)
+	}
+
 	var zones []struct {
 		UUID string `json:"uuid"`
 		Name string `json:"zone"`
 	}
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read zones response body: %w", err)
+	}
 	if err := json.Unmarshal(body, &zones); err != nil {
 		return "", fmt.Errorf("failed to parse zones response: %w", err)
 	}
@@ -228,7 +257,10 @@ func createTXTRecord(zoneID, fqdn, key, token string) error {
 
 	zoneTXTRecordsURL := dnsAPIBaseURL + "%s/txt/"
 	url := fmt.Sprintf(zoneTXTRecordsURL, zoneID)
-	jsonBody, _ := json.Marshal(record)
+	jsonBody, err := json.Marshal(record)
+	if err != nil {
+		return fmt.Errorf("failed to marshal TXT record: %w", err)
+	}
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonBody))
 	if err != nil {
@@ -245,7 +277,10 @@ func createTXTRecord(zoneID, fqdn, key, token string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		body, _ := io.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("create failed with status %d: failed to read response body: %w", resp.StatusCode, err)
+		}
 		return fmt.Errorf("create failed with status %d: %s", resp.StatusCode, body)
 	}
 
@@ -257,7 +292,10 @@ func deleteTXTRecord(zoneID, fqdn, key, token string) error {
 	zoneTXTRecordsURL := dnsAPIBaseURL + "%s/txt/"
 	url := fmt.Sprintf(zoneTXTRecordsURL, zoneID)
 
-	req, _ := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create list TXT records request: %w", err)
+	}
 	req.Header.Set("X-Auth-Token", token)
 	req.Header.Set("Content-Type", "application/json")
 
@@ -268,6 +306,14 @@ func deleteTXTRecord(zoneID, fqdn, key, token string) error {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("failed to list TXT records with status %d: failed to read response body: %w", resp.StatusCode, err)
+		}
+		return fmt.Errorf("failed to list TXT records with status %d: %s", resp.StatusCode, body)
+	}
+
 	var recordsResponse struct {
 		TXTRecords []struct {
 			UUID    string `json:"uuid"`
@@ -276,7 +322,10 @@ func deleteTXTRecord(zoneID, fqdn, key, token string) error {
 		} `json:"txt_records"`
 	}
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read TXT records response body: %w", err)
+	}
 	if err := json.Unmarshal(body, &recordsResponse); err != nil {
 		return fmt.Errorf("failed to parse TXT records: %w", err)
 	}
@@ -288,7 +337,11 @@ func deleteTXTRecord(zoneID, fqdn, key, token string) error {
 			zoneTXTRecordsURL := dnsAPIBaseURL + "%s/txt/%s"
 			deleteURL := fmt.Sprintf(zoneTXTRecordsURL, zoneID, r.UUID)
 
-			delReq, _ := http.NewRequest("DELETE", deleteURL, nil)
+			delReq, err := http.NewRequest("DELETE", deleteURL, nil)
+			if err != nil {
+				deleteErrors = append(deleteErrors, fmt.Sprintf("failed to create delete request for TXT record %q: %v", r.UUID, err))
+				continue
+			}
 			delReq.Header.Set("X-Auth-Token", token)
 
 			resp, err := httpClient.Do(delReq)
@@ -296,7 +349,7 @@ func deleteTXTRecord(zoneID, fqdn, key, token string) error {
 				deleteErrors = append(deleteErrors, fmt.Sprintf("failed to delete TXT record %q: %v", r.UUID, err))
 				continue
 			}
-			defer resp.Body.Close()
+			resp.Body.Close()
 
 			if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
 				deleteErrors = append(deleteErrors, fmt.Sprintf(
