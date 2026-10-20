@@ -49,7 +49,7 @@
  helm install -n cert-manager-webhook-vkcloud ./deploy/cert-manager-webhook-vkcloud --namespace cert-manager -f ./deploy/cert-manager-webhook-vkcloud/values.yaml
  ```
 
- > Обратите внимание: webhook будет запущен как Deployment и зарегистрирован в cert-manager по имени `groupName`, указанному в коде (например: `acme.cloud.vk.com`).
+ > Обратите внимание: webhook будет запущен как Deployment и зарегистрирован в cert-manager по имени `groupName`, указанному в `values.yaml` (через переменную окружения `GROUP_NAME`, например: `acme.cloud.vk.com`).
 
 ### 4. Удаление с помощью Helm
 
@@ -218,6 +218,8 @@ helm uninstall -n cert-manager cert-manager-webhook-vkcloud
  ### Нужен ли Docker?
 
  Да, но образ уже собран и доступен на Docker Hub / GitLab. Вы также можете собрать свой, если потребуется кастомизация.
+
+> Рекомендуется фиксировать версию образа (например, `tag: 1.0.9`) вместо `latest`, и использовать `pullPolicy: IfNotPresent`, чтобы избежать непредсказуемых обновлений и лишних pulls при каждом перезапуске пода.
 
  ### Что делать, если домен не находится?
 
