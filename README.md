@@ -46,7 +46,7 @@
  ### 3. Установите webhook с помощью Helm
 
  ```bash
- helm install -n cert-manager-webhook-vkcloud ./deploy/cert-manager-webhook-vkcloud --namespace cert-manager -f ./deploy/cert-manager-webhook-vkcloud/values.yaml
+ helm install cert-manager-webhook-vkcloud ./deploy/cert-manager-webhook-vkcloud --namespace cert-manager -f ./deploy/cert-manager-webhook-vkcloud/values.yaml
  ```
 
  > Обратите внимание: webhook будет запущен как Deployment и зарегистрирован в cert-manager по имени `groupName`, указанному в `values.yaml` (через переменную окружения `GROUP_NAME`, например: `acme.cloud.vk.com`).
@@ -77,7 +77,7 @@ helm uninstall -n cert-manager cert-manager-webhook-vkcloud
    os_username: "<ваш_логин>"
    os_password: "<ваш_пароль>"
    os_project_id: "<ID_проекта>"
-   os_domain_name: "users"
+   os_domain_name: "users" # service-users для сервисного аккаунта   
  ```
 
  Примените его:
@@ -219,7 +219,7 @@ helm uninstall -n cert-manager cert-manager-webhook-vkcloud
 
  Да, но образ уже собран и доступен на Docker Hub / GitLab. Вы также можете собрать свой, если потребуется кастомизация.
 
-> Рекомендуется фиксировать версию образа (например, `tag: 1.0.9`) вместо `latest`, и использовать `pullPolicy: IfNotPresent`, чтобы избежать непредсказуемых обновлений и лишних pulls при каждом перезапуске пода.
+> Рекомендуется фиксировать версию образа (например, `tag: v1.0.9`) вместо `latest`, и использовать `pullPolicy: IfNotPresent`, чтобы избежать непредсказуемых обновлений и лишних pulls при каждом перезапуске пода.
 
  ### Что делать, если домен не находится?
 
