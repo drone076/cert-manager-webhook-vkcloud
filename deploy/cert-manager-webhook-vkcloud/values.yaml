@@ -14,8 +14,10 @@ certManager:
 
 image:
   repository: drone076/cert-manager-webhook-vkcloud
-  tag: 1.0.9
+  tag: v1.0.9
   pullPolicy: IfNotPresent
+  pullSecrets: []
+  #   - name: my-registry-secret
 
 nameOverride: ""
 fullnameOverride: ""

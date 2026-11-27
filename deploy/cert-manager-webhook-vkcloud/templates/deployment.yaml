@@ -20,6 +20,10 @@ spec:
         app: {{ include "cert-manager-webhook-vkcloud.name" . }}
         release: {{ .Release.Name }}
     spec:
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       serviceAccountName: {{ include "cert-manager-webhook-vkcloud.fullname" . }}
       containers:
         - name: {{ .Chart.Name }}

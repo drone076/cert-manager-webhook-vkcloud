@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -100,7 +101,7 @@ func (c *vkcloudDNSSolver) CleanUp(ch *acme.ChallengeRequest) error {
 		return err
 	}
 
-	err = deleteTXTRecord(dnsZoneID, ch.ResolvedFQDN, ch.Key, authToken)
+	err = deleteTXTRecord(dnsZoneID, ch.ResolvedZone, ch.ResolvedFQDN, ch.Key, authToken)
 	if err != nil {
 		return err
 	}
@@ -137,11 +138,12 @@ func authenticate(clientset *kubernetes.Clientset, namespace string, secretRef c
 		return "", fmt.Errorf("failed to fetch secret %q: %w", secretRef.Name, err)
 	}
 
-	osAuthURL := string(secret.Data["os_auth_url"])
-	osUsername := string(secret.Data["os_username"])
-	osPassword := string(secret.Data["os_password"])
-	osProjectID := string(secret.Data["os_project_id"])
-	osDomainName := string(secret.Data["os_domain_name"])
+	get := func(k string) string { return strings.TrimSpace(string(secret.Data[k])) }
+	osAuthURL := get("os_auth_url")
+	osUsername := get("os_username")
+	osPassword := string(secret.Data["os_password"]) // don't trim
+	osProjectID := get("os_project_id")
+	osDomainName := get("os_domain_name")
 
 	body := map[string]any{
 		"auth": map[string]any{
@@ -151,9 +153,7 @@ func authenticate(clientset *kubernetes.Clientset, namespace string, secretRef c
 					"user": map[string]any{
 						"name":     osUsername,
 						"password": osPassword,
-						"domain": map[string]string{
-							"id": osDomainName,
-						},
+						"domain":   map[string]string{"name": osDomainName},
 					},
 				},
 			},
@@ -288,7 +288,7 @@ func createTXTRecord(zoneID, fqdn, key, token string) error {
 }
 
 // deleteTXTRecord removes the specific TXT record
-func deleteTXTRecord(zoneID, fqdn, key, token string) error {
+func deleteTXTRecord(zoneID, zone, fqdn, key, token string) error {
 	zoneTXTRecordsURL := dnsAPIBaseURL + "%s/txt/"
 	url := fmt.Sprintf(zoneTXTRecordsURL, zoneID)
 
@@ -314,51 +314,59 @@ func deleteTXTRecord(zoneID, fqdn, key, token string) error {
 		return fmt.Errorf("failed to list TXT records with status %d: %s", resp.StatusCode, body)
 	}
 
-	var recordsResponse struct {
-		TXTRecords []struct {
-			UUID    string `json:"uuid"`
-			Name    string `json:"name"`
-			Content string `json:"content"`
-		} `json:"txt_records"`
+	type txtRecord struct {
+		UUID    string `json:"uuid"`
+		Name    string `json:"name"`
+		Content string `json:"content"`
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("failed to read TXT records response body: %w", err)
 	}
-	if err := json.Unmarshal(body, &recordsResponse); err != nil {
+
+	var records []txtRecord
+	if err := json.Unmarshal(body, &records); err != nil {
 		return fmt.Errorf("failed to parse TXT records: %w", err)
 	}
 
 	var deleteErrors []string
+	zoneName := strings.ToLower(strings.TrimSuffix(zone, "."))
+	wantName := strings.TrimSuffix(strings.ToLower(strings.TrimSuffix(fqdn, ".")), "."+zoneName)
+	matched := 0
 
-	for _, r := range recordsResponse.TXTRecords {
-		if r.Name == fqdn && r.Content == key {
-			zoneTXTRecordsURL := dnsAPIBaseURL + "%s/txt/%s"
-			deleteURL := fmt.Sprintf(zoneTXTRecordsURL, zoneID, r.UUID)
-
-			delReq, err := http.NewRequest("DELETE", deleteURL, nil)
-			if err != nil {
-				deleteErrors = append(deleteErrors, fmt.Sprintf("failed to create delete request for TXT record %q: %v", r.UUID, err))
-				continue
-			}
-			delReq.Header.Set("X-Auth-Token", token)
-
-			resp, err := httpClient.Do(delReq)
-			if err != nil {
-				deleteErrors = append(deleteErrors, fmt.Sprintf("failed to delete TXT record %q: %v", r.UUID, err))
-				continue
-			}
-			resp.Body.Close()
-
-			if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-				deleteErrors = append(deleteErrors, fmt.Sprintf(
-					"failed to delete TXT record %q: unexpected status code %d",
-					r.UUID,
-					resp.StatusCode,
-				))
-			}
+	for _, r := range records {
+		if strings.ToLower(r.Name) != wantName || strings.Trim(strings.TrimSpace(r.Content), "\"") != key {
+			continue
 		}
+		matched++
+
+		deleteURL := fmt.Sprintf(dnsAPIBaseURL+"%s/txt/%s", zoneID, r.UUID)
+		delReq, err := http.NewRequest("DELETE", deleteURL, nil)
+		if err != nil {
+			deleteErrors = append(deleteErrors, fmt.Sprintf("failed to create delete request for TXT record %q: %v", r.UUID, err))
+			continue
+		}
+		delReq.Header.Set("X-Auth-Token", token)
+
+		resp, err := httpClient.Do(delReq)
+		if err != nil {
+			deleteErrors = append(deleteErrors, fmt.Sprintf("failed to delete TXT record %q: %v", r.UUID, err))
+			continue
+		}
+		resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
+			deleteErrors = append(deleteErrors, fmt.Sprintf(
+				"failed to delete TXT record %q: unexpected status code %d",
+				r.UUID,
+				resp.StatusCode,
+			))
+		}
+	}
+
+	if matched == 0 {
+		log.Printf("cleanup: no TXT record matched fqdn=%q key=%q among %d records: %+v", fqdn, key, len(records), records)
 	}
 
 	if len(deleteErrors) > 0 {
